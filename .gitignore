@@ -17,3 +17,4 @@
 /website/node_modules/
 /website/.astro/
 /website/dist/
+/build-macos/

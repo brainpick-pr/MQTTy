@@ -17,19 +17,9 @@ project(
   'MQTTy',
   'rust',
   version: run_command(
-    # Plain old AWK, sorry for tq tool, but you are very hard to install in networkless
-    # environments
-    'awk',
-    '''
-      {
-        match($0, /\s*version\s*=\s*"(.*)"/, arr);
-        if (arr[1] != "") {
-          print arr[1];
-          exit;
-        }
-      }
-    ''',
-    'Cargo.toml',
+    # Use grep + sed for POSIX compatibility (macOS awk doesn't support gawk features)
+    'sh', '-c',
+    'grep "^version" Cargo.toml | head -1 | sed \'s/.*"\\(.*\\)"/\\1/\'',
     check: true,
   ).stdout().strip(),
   meson_version: '>= 0.59',
