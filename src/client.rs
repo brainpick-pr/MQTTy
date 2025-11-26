@@ -84,7 +84,15 @@ mod imp {
                 .server_uri(obj.url())
                 .create_client()
             {
-                Err(e) => panic!("CLIENT CREATION ERROR {:?}", e),
+                Err(e) => {
+                    tracing::error!("Failed to create MQTT client: {:?}", e);
+                    // Create a dummy client with a fallback URL to avoid panic
+                    // The connection will fail later with a proper error message
+                    paho::CreateOptionsBuilder::new()
+                        .server_uri("tcp://invalid:1883")
+                        .create_client()
+                        .expect("Failed to create fallback client")
+                }
                 Ok(c) => c,
             };
 

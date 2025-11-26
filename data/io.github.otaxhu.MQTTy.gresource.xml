@@ -19,6 +19,13 @@
     <file compressed="true" preprocess="xml-stripblanks">ui/publish_view/publish_user_props_tab.ui</file>
     <file compressed="true" preprocess="xml-stripblanks">ui/publish_view/publish_auth_tab.ui</file>
 
+    <!-- Subscribe view related -->
+    <file compressed="true" preprocess="xml-stripblanks">ui/subscribe_view/subscribe_view.ui</file>
+    <file compressed="true" preprocess="xml-stripblanks">ui/subscribe_view/subscribe_view_notebook.ui</file>
+    <file compressed="true" preprocess="xml-stripblanks">ui/subscribe_view/subscribe_general_tab.ui</file>
+    <file compressed="true" preprocess="xml-stripblanks">ui/subscribe_view/subscribe_auth_tab.ui</file>
+    <file compressed="true" preprocess="xml-stripblanks">ui/subscribe_view/message_row.ui</file>
+
     <!-- Pages -->
     <file compressed="true" preprocess="xml-stripblanks">ui/pages/base_page.ui</file>
     <file compressed="true" preprocess="xml-stripblanks">ui/pages/add_conn_page.ui</file>

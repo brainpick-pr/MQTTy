@@ -12,28 +12,26 @@
 //
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
+using Gtk 4.0;
+using Adw 1;
 
-mod add_conn_card;
-mod conn_card;
-mod edit_conn_list_box;
-mod key_value_row;
-mod publish_view;
-mod source_view;
-mod subscribe_view;
+template $MQTTySubscribeAuthTab: Adw.Bin {
+  Adw.Clamp {
+    Adw.PreferencesGroup {
+      margin-top: 16;
+      margin-bottom: 16;
+      margin-start: 16;
+      margin-end: 16;
 
-pub mod base_card;
+      Adw.EntryRow {
+        title: _("Username");
+        text: bind template.username bidirectional;
+      }
 
-pub use add_conn_card::MQTTyAddConnCard;
-pub use base_card::MQTTyBaseCard;
-pub use conn_card::MQTTyConnCard;
-pub use edit_conn_list_box::MQTTyEditConnListBox;
-pub use key_value_row::MQTTyKeyValueRow;
-pub use publish_view::{
-    MQTTyPublishAuthTab, MQTTyPublishBodyTab, MQTTyPublishGeneralTab, MQTTyPublishUserPropsTab,
-    MQTTyPublishView,
-};
-pub use source_view::MQTTySourceView;
-pub use subscribe_view::{
-    MQTTyMessageRow, MQTTySubscribeAuthTab, MQTTySubscribeGeneralTab, MQTTySubscribeView,
-    MQTTySubscribeViewNotebook,
-};
+      Adw.PasswordEntryRow {
+        title: _("Password");
+        text: bind template.password bidirectional;
+      }
+    }
+  }
+}

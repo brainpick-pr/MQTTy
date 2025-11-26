@@ -29,14 +29,14 @@ mod imp {
     use super::*;
 
     #[derive(Default, gtk::CompositeTemplate, glib::Properties)]
-    #[template(resource = "/io/github/otaxhu/MQTTy/ui/publish_view/publish_general_tab.ui")]
-    #[properties(wrapper_type = super::MQTTyPublishGeneralTab)]
-    pub struct MQTTyPublishGeneralTab {
-        #[property(get, set)]
-        topic: RefCell<String>,
-
+    #[template(resource = "/io/github/otaxhu/MQTTy/ui/subscribe_view/subscribe_general_tab.ui")]
+    #[properties(wrapper_type = super::MQTTySubscribeGeneralTab)]
+    pub struct MQTTySubscribeGeneralTab {
         #[property(get, set)]
         url: RefCell<String>,
+
+        #[property(get, set)]
+        topic: RefCell<String>,
 
         #[property(get, set)]
         username: RefCell<String>,
@@ -61,10 +61,10 @@ mod imp {
     }
 
     #[glib::object_subclass]
-    impl ObjectSubclass for MQTTyPublishGeneralTab {
-        const NAME: &'static str = "MQTTyPublishGeneralTab";
+    impl ObjectSubclass for MQTTySubscribeGeneralTab {
+        const NAME: &'static str = "MQTTySubscribeGeneralTab";
 
-        type Type = super::MQTTyPublishGeneralTab;
+        type Type = super::MQTTySubscribeGeneralTab;
 
         type ParentType = adw::Bin;
 
@@ -79,7 +79,7 @@ mod imp {
     }
 
     #[glib::derived_properties]
-    impl ObjectImpl for MQTTyPublishGeneralTab {
+    impl ObjectImpl for MQTTySubscribeGeneralTab {
         fn constructed(&self) {
             self.parent_constructed();
 
@@ -104,11 +104,11 @@ mod imp {
             &*SIGNALS
         }
     }
-    impl WidgetImpl for MQTTyPublishGeneralTab {}
-    impl BinImpl for MQTTyPublishGeneralTab {}
+    impl WidgetImpl for MQTTySubscribeGeneralTab {}
+    impl BinImpl for MQTTySubscribeGeneralTab {}
 
     #[gtk::template_callbacks]
-    impl MQTTyPublishGeneralTab {
+    impl MQTTySubscribeGeneralTab {
         #[template_callback]
         fn or(&self, a: bool, b: bool) -> bool {
             a || b
@@ -117,12 +117,12 @@ mod imp {
 }
 
 glib::wrapper! {
-    pub struct MQTTyPublishGeneralTab(ObjectSubclass<imp::MQTTyPublishGeneralTab>)
+    pub struct MQTTySubscribeGeneralTab(ObjectSubclass<imp::MQTTySubscribeGeneralTab>)
         @extends gtk::Widget, adw::Bin,
         @implements gtk::Accessible, gtk::Buildable, gtk::ConstraintTarget;
 }
 
-impl MQTTyPublishGeneralTab {
+impl MQTTySubscribeGeneralTab {
     pub fn setup_profile_combo(&self) {
         let app = MQTTyApplication::get_singleton();
         let connections = app.settings_connections();

@@ -29,8 +29,9 @@ use crate::main_window::MQTTyWindow;
 use crate::pages::{MQTTyAddConnPage, MQTTyAllConnPage, MQTTyBasePage, MQTTyPanelPage};
 use crate::widgets::{
     MQTTyAddConnCard, MQTTyBaseCard, MQTTyConnCard, MQTTyEditConnListBox, MQTTyKeyValueRow,
-    MQTTyPublishAuthTab, MQTTyPublishBodyTab, MQTTyPublishGeneralTab, MQTTyPublishUserPropsTab,
-    MQTTyPublishView, MQTTySourceView,
+    MQTTyMessageRow, MQTTyPublishAuthTab, MQTTyPublishBodyTab, MQTTyPublishGeneralTab,
+    MQTTyPublishUserPropsTab, MQTTyPublishView, MQTTySourceView, MQTTySubscribeAuthTab,
+    MQTTySubscribeGeneralTab, MQTTySubscribeView, MQTTySubscribeViewNotebook,
 };
 
 mod imp {
@@ -83,6 +84,13 @@ mod imp {
             MQTTyPublishBodyTab::static_type();
             MQTTyPublishUserPropsTab::static_type();
             MQTTyPublishAuthTab::static_type();
+
+            // Subscribe widgets
+            MQTTySubscribeView::static_type();
+            MQTTySubscribeViewNotebook::static_type();
+            MQTTySubscribeGeneralTab::static_type();
+            MQTTySubscribeAuthTab::static_type();
+            MQTTyMessageRow::static_type();
 
             // Pages
             MQTTyBasePage::static_type();
@@ -196,71 +204,29 @@ impl MQTTyApplication {
     /// updated with external settings,
     /// app.settings_connections()::items-changed it's emitted again, etc.
     fn setup_settings(&self) {
-        // let settings = self.settings();
-        //
-        // let external_conns = settings.get::<Vec<MQTTySettingConnection>>("connections");
-        //
-        // let app_conns = self.settings_connections();
-        //
-        // app_conns.extend_from_slice(&external_conns);
-        //
-        // let clients_ref = self.clients();
-        //
-        // let mut clients_mut = clients_ref.borrow_mut();
-        // clients_mut.reserve(external_conns.len());
-        //
-        // for conn in app_conns
-        //     .iter::<MQTTySettingConnection>()
-        //     .map(|i| i.unwrap())
-        // {
-        //     let connection = MQTTyClient::new(&conn);
-        //
-        //     clients_mut.push(connection);
-        // }
-        //
-        // // Save settings to external GSettings, and creating MQTT clients for each one
-        // app_conns.connect_items_changed(glib::clone!(
-        //     #[strong]
-        //     settings,
-        //     #[strong]
-        //     clients_ref,
-        //     move |list: &gio::ListStore, pos, rem, add| {
-        //         let mut clients_mut = clients_ref.borrow_mut();
-        //
-        //         settings
-        //             .set(
-        //                 "connections",
-        //                 list.iter::<MQTTySettingConnection>()
-        //                     .map(|i| i.unwrap().downcast::<MQTTySettingConnection>().unwrap())
-        //                     .collect::<Vec<_>>(),
-        //             )
-        //             .unwrap();
-        //
-        //         let pos = pos as usize;
-        //         let rem = rem as usize;
-        //         let add = add as usize;
-        //
-        //         // Removals
-        //         for client in clients_mut.splice(pos..pos + rem, None) {
-        //             client.disconnect_client();
-        //         }
-        //
-        //         // Additions
-        //         clients_mut.reserve(add);
-        //
-        //         for i in pos..pos + add {
-        //             let new_client = MQTTyClient::new(
-        //                 &list
-        //                     .item(i as u32)
-        //                     .unwrap()
-        //                     .downcast::<MQTTySettingConnection>()
-        //                     .unwrap(),
-        //             );
-        //
-        //             clients_mut.insert(i, new_client);
-        //         }
-        //     }
-        // ));
+        let settings = self.settings();
+
+        let external_conns = settings.get::<Vec<MQTTySettingConnection>>("connections");
+
+        let app_conns = self.settings_connections();
+
+        app_conns.extend_from_slice(&external_conns);
+
+        // Save settings to external GSettings when connections change
+        app_conns.connect_items_changed(glib::clone!(
+            #[strong]
+            settings,
+            move |list: &gio::ListStore, _pos, _rem, _add| {
+                let conns: Vec<MQTTySettingConnection> = list
+                    .iter::<MQTTySettingConnection>()
+                    .filter_map(|i| i.ok())
+                    .collect();
+
+                if let Err(e) = settings.set("connections", &conns) {
+                    tracing::error!("Failed to save connections to settings: {}", e);
+                }
+            }
+        ));
     }
 
     fn setup_gactions(&self) {

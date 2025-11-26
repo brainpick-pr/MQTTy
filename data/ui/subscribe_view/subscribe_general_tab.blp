@@ -15,7 +15,7 @@
 using Gtk 4.0;
 using Adw 1;
 
-template $MQTTyPublishGeneralTab: Adw.Bin {
+template $MQTTySubscribeGeneralTab: Adw.Bin {
   Adw.Clamp {
     Box {
       orientation: vertical;
@@ -52,12 +52,14 @@ template $MQTTyPublishGeneralTab: Adw.Bin {
             CheckButton mqtt_3_button {
               label: C_("mqtt version number", "v3.x");
               group: mqtt_5_button;
-              action-name: "publish-view-notebook.mqtt-version";
+              action-name: "subscribe-notebook.mqtt-version";
+              action-target: "\"3\"";
             }
 
             CheckButton mqtt_5_button {
               label: C_("mqtt version number", "v5");
-              action-name: "publish-view-notebook.mqtt-version";
+              action-name: "subscribe-notebook.mqtt-version";
+              action-target: "\"5\"";
             }
           }
         }
@@ -75,18 +77,21 @@ template $MQTTyPublishGeneralTab: Adw.Bin {
 
             CheckButton qos_0_button {
               label: _("0");
-              action-name: "publish-view-notebook.qos";
+              action-name: "subscribe-notebook.qos";
+              action-target: "\"0\"";
             }
 
             CheckButton qos_1_button {
               label: _("1");
-              action-name: "publish-view-notebook.qos";
+              action-name: "subscribe-notebook.qos";
+              action-target: "\"1\"";
               group: qos_0_button;
             }
 
             CheckButton qos_2_button {
               label: _("2");
-              action-name: "publish-view-notebook.qos";
+              action-name: "subscribe-notebook.qos";
+              action-target: "\"2\"";
               group: qos_0_button;
             }
           }

@@ -1,0 +1,69 @@
+// Copyright (c) 2025 Oscar Pernia
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU General Public License for more details.
+//
+// You should have received a copy of the GNU General Public License
+// along with this program.  If not, see <https://www.gnu.org/licenses/>.
+using Gtk 4.0;
+using Adw 1;
+
+template $MQTTyMessageRow: Box {
+  orientation: vertical;
+  spacing: 4;
+  margin-start: 12;
+  margin-end: 12;
+  margin-top: 8;
+  margin-bottom: 8;
+
+  Box {
+    orientation: horizontal;
+    spacing: 8;
+
+    Label topic_label {
+      styles ["heading"]
+      ellipsize: end;
+      xalign: 0;
+      hexpand: true;
+      label: bind template.topic;
+    }
+
+    Label timestamp_label {
+      styles ["dim-label", "caption"]
+      label: bind template.timestamp;
+    }
+  }
+
+  Label body_label {
+    styles ["body"]
+    ellipsize: end;
+    xalign: 0;
+    lines: 2;
+    wrap: true;
+    wrap-mode: word_char;
+    label: bind template.body_preview;
+  }
+
+  Box {
+    orientation: horizontal;
+    spacing: 8;
+
+    Label {
+      styles ["dim-label", "caption"]
+      label: bind template.qos_label;
+    }
+
+    Label {
+      styles ["dim-label", "caption"]
+      visible: bind template.retained;
+      label: _("Retained");
+    }
+  }
+}

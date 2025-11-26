@@ -19,45 +19,130 @@ template $MQTTyEditConnListBox: Adw.Bin {
   // TODO: ScrolledWindow should be in an upper layer for more control.
   ScrolledWindow {
     Adw.Clamp {
-      ListBox {
+      Box {
+        orientation: vertical;
         margin-top: 16;
         margin-bottom: 16;
         margin-start: 16;
         margin-end: 16;
+        spacing: 16;
 
-        styles [
-          "boxed-list-separate",
-        ]
+        // Connection Profile Name
+        ListBox {
+          styles ["boxed-list"]
 
-        Adw.EntryRow url_row {
-          title: _("URL");
-          entry-activated => $on_save_conn() swapped;
+          Adw.EntryRow name_row {
+            title: _("Profile Name");
+            entry-activated => $on_save_conn() swapped;
+          }
         }
 
-        Adw.EntryRow topic_row {
-          title: _("Topic");
-          entry-activated => $on_save_conn() swapped;
+        // Connection Settings
+        Adw.PreferencesGroup {
+          title: _("Connection");
+
+          Adw.EntryRow url_row {
+            title: _("URL");
+            entry-activated => $on_save_conn() swapped;
+          }
+
+          Adw.EntryRow topic_row {
+            title: _("Topic");
+            entry-activated => $on_save_conn() swapped;
+          }
         }
 
-        Adw.ButtonRow {
-          title: _("Delete");
-          visible: bind template.editing;
+        // Protocol Settings
+        Adw.PreferencesGroup {
+          title: _("Protocol");
 
-          styles [
-            "destructive-action",
-          ]
+          Adw.ActionRow {
+            title: _("MQTT Version");
+            title-lines: 1;
+            focusable: false;
 
-          activated => $on_delete_conn() swapped;
+            [suffix]
+            Box {
+              valign: center;
+
+              CheckButton mqtt_3_button {
+                label: C_("mqtt version number", "v3.x");
+                group: mqtt_5_button;
+              }
+
+              CheckButton mqtt_5_button {
+                label: C_("mqtt version number", "v5");
+              }
+            }
+          }
+
+          Adw.ActionRow {
+            title: C_("mqtt qos abbreviation", "QoS");
+            title-lines: 1;
+            subtitle: _("Quality of service");
+            subtitle-lines: 1;
+            focusable: false;
+
+            [suffix]
+            Box {
+              valign: center;
+
+              CheckButton qos_0_button {
+                label: _("0");
+              }
+
+              CheckButton qos_1_button {
+                label: _("1");
+                group: qos_0_button;
+              }
+
+              CheckButton qos_2_button {
+                label: _("2");
+                group: qos_0_button;
+              }
+            }
+          }
         }
 
-        Adw.ButtonRow {
-          title: _("Save");
+        // Authentication
+        Adw.PreferencesGroup {
+          title: _("Authentication");
 
-          styles [
-            "suggested-action",
-          ]
+          Adw.EntryRow username_row {
+            title: _("Username");
+            entry-activated => $on_save_conn() swapped;
+          }
 
-          activated => $on_save_conn() swapped;
+          Adw.PasswordEntryRow password_row {
+            title: _("Password");
+            entry-activated => $on_save_conn() swapped;
+          }
+        }
+
+        // Actions
+        ListBox {
+          styles ["boxed-list-separate"]
+
+          Adw.ButtonRow {
+            title: _("Delete");
+            visible: bind template.editing;
+
+            styles [
+              "destructive-action",
+            ]
+
+            activated => $on_delete_conn() swapped;
+          }
+
+          Adw.ButtonRow {
+            title: _("Save");
+
+            styles [
+              "suggested-action",
+            ]
+
+            activated => $on_save_conn() swapped;
+          }
         }
       }
     }

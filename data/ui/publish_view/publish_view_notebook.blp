@@ -28,9 +28,11 @@ template $MQTTyPublishViewNotebook: Adw.Bin {
         vscrollbar-policy: automatic;
         // General tab also populates mqtt_version and qos properties to this notebook, but we are
         // capturing both via installed property actions in this notebook
-        $MQTTyPublishGeneralTab {
+        $MQTTyPublishGeneralTab general_tab {
           topic: bind template.topic bidirectional;
           url: bind template.url bidirectional;
+          username: bind template.username bidirectional;
+          password: bind template.password bidirectional;
         }
       };
     }

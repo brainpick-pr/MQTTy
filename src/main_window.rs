@@ -95,12 +95,15 @@ impl MQTTyWindow {
 
         let settings = app.settings();
 
-        settings.set_int("window-width", width).unwrap();
-        settings.set_int("window-height", height).unwrap();
-
-        settings
-            .set_boolean("is-maximized", self.is_maximized())
-            .unwrap();
+        if let Err(e) = settings.set_int("window-width", width) {
+            tracing::warn!("Failed to save window width: {}", e);
+        }
+        if let Err(e) = settings.set_int("window-height", height) {
+            tracing::warn!("Failed to save window height: {}", e);
+        }
+        if let Err(e) = settings.set_boolean("is-maximized", self.is_maximized()) {
+            tracing::warn!("Failed to save maximized state: {}", e);
+        }
     }
 
     fn load_window_size(&self) {

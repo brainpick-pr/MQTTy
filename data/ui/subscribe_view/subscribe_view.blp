@@ -1,0 +1,99 @@
+// Copyright (c) 2025 Oscar Pernia
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU General Public License for more details.
+//
+// You should have received a copy of the GNU General Public License
+// along with this program.  If not, see <https://www.gnu.org/licenses/>.
+using Gtk 4.0;
+using Adw 1;
+
+template $MQTTySubscribeView: Adw.Bin {
+  Box {
+    orientation: vertical;
+
+    Adw.TabBar {
+      styles [
+        "inline",
+      ]
+
+      autohide: false;
+      view: tab_view;
+
+      end-action-widget: Box {
+        spacing: 6;
+
+        Button {
+          styles [
+            "flat",
+          ]
+
+          action-name: "subscribe-view.new-tab";
+          icon-name: "tab-new-symbolic";
+        }
+
+        Button subscribe_button {
+          styles [
+            "suggested-action",
+          ]
+
+          // Not visible by default
+          visible: false;
+          action-name: "subscribe-view.subscribe";
+          label: _("Subscribe");
+        }
+      };
+    }
+
+    Stack stack {
+      vexpand: true;
+
+      StackPage {
+        name: "no-tabs";
+
+        child: Adw.StatusPage {
+          title: _("Subscribe to topics");
+          description: _("It seems that you don't have any active subscriptions");
+          icon-name: "chat-bubbles-empty-symbolic";
+
+          child: Adw.Clamp {
+            Button {
+              styles [
+                "suggested-action",
+                "pill",
+              ]
+
+              action-name: "subscribe-view.new-tab";
+
+              child: Adw.ButtonContent {
+                label: _("New subscription");
+                icon-name: "tab-new-symbolic";
+              };
+            }
+          };
+        };
+      }
+
+      StackPage {
+        name: "tabs";
+
+        child: Box {
+          orientation: vertical;
+
+          Separator {}
+
+          Adw.TabView tab_view {
+            vexpand: true;
+          }
+        };
+      }
+    }
+  }
+}

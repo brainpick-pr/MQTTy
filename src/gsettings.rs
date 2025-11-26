@@ -28,10 +28,25 @@ mod imp {
     #[properties(wrapper_type = super::MQTTySettingConnection)]
     pub struct MQTTySettingConnection {
         #[property(get, set)]
+        name: RefCell<String>,
+
+        #[property(get, set)]
         url: RefCell<String>,
 
         #[property(get, set)]
         topic: RefCell<String>,
+
+        #[property(get, set)]
+        username: RefCell<String>,
+
+        #[property(get, set)]
+        password: RefCell<String>,
+
+        #[property(get, set)]
+        mqtt_version: RefCell<String>,
+
+        #[property(get, set)]
+        qos: RefCell<String>,
     }
 
     #[glib::object_subclass]
@@ -52,21 +67,39 @@ glib::wrapper! {
 }
 
 impl MQTTySettingConnection {
-    pub fn new(url: &String, topic: &String) -> Self {
+    pub fn new(
+        name: &str,
+        url: &str,
+        topic: &str,
+        username: &str,
+        password: &str,
+        mqtt_version: &str,
+        qos: &str,
+    ) -> Self {
         glib::Object::builder()
+            .property("name", name)
             .property("url", url)
             .property("topic", topic)
+            .property("username", username)
+            .property("password", password)
+            .property("mqtt_version", mqtt_version)
+            .property("qos", qos)
             .build()
+    }
+
+    /// Create a new connection profile with just URL and topic (for backwards compatibility)
+    pub fn new_simple(url: &str, topic: &str) -> Self {
+        Self::new("", url, topic, "", "", "3", "0")
     }
 }
 
 impl Default for MQTTySettingConnection {
     fn default() -> Self {
-        Self::new(&"".to_string(), &"".to_string())
+        Self::new("", "", "", "", "", "3", "0")
     }
 }
 
-const VARIANT_TYPE: &str = "(ss)";
+const VARIANT_TYPE: &str = "(sssssss)";
 
 impl StaticVariantType for MQTTySettingConnection {
     fn static_variant_type() -> std::borrow::Cow<'static, gtk::glib::VariantTy> {
@@ -75,9 +108,14 @@ impl StaticVariantType for MQTTySettingConnection {
 }
 
 /// Indexes mapping:
-/// - 0 <-> url: URL connection
-/// - 1 <-> topic: MQTT topic
-type MQTTySettingConnectionTuple = (String, String);
+/// - 0 <-> name: Connection profile name
+/// - 1 <-> url: URL connection
+/// - 2 <-> topic: MQTT topic
+/// - 3 <-> username: Authentication username
+/// - 4 <-> password: Authentication password
+/// - 5 <-> mqtt_version: MQTT version ("3" or "5")
+/// - 6 <-> qos: Quality of Service ("0", "1", or "2")
+type MQTTySettingConnectionTuple = (String, String, String, String, String, String, String);
 
 impl FromVariant for MQTTySettingConnection {
     fn from_variant(variant: &gtk::glib::Variant) -> Option<Self> {
@@ -96,13 +134,21 @@ impl FromVariant for MQTTySettingConnection {
 
 impl From<MQTTySettingConnectionTuple> for MQTTySettingConnection {
     fn from(value: MQTTySettingConnectionTuple) -> Self {
-        Self::new(&value.0, &value.1)
+        Self::new(&value.0, &value.1, &value.2, &value.3, &value.4, &value.5, &value.6)
     }
 }
 
 impl From<MQTTySettingConnection> for MQTTySettingConnectionTuple {
     fn from(value: MQTTySettingConnection) -> Self {
-        (value.url(), value.topic())
+        (
+            value.name(),
+            value.url(),
+            value.topic(),
+            value.username(),
+            value.password(),
+            value.mqtt_version(),
+            value.qos(),
+        )
     }
 }
 

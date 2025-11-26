@@ -71,7 +71,10 @@ mod imp {
 
             let obj = self.obj();
 
-            let conn_model = app.settings_n_connection(obj.nth_conn()).unwrap();
+            let Some(conn_model) = app.settings_n_connection(obj.nth_conn()) else {
+                tracing::error!("Connection not found at index {}", obj.nth_conn());
+                return;
+            };
 
             obj.upcast_ref::<adw::NavigationPage>()
                 .set_title(&conn_model.topic());
@@ -81,10 +84,13 @@ mod imp {
                     #[weak]
                     obj,
                     move |view_stack| {
-                        obj.upcast_ref::<MQTTyBasePage>()
-                            .top_end_widget()
-                            .unwrap()
-                            .set_visible(view_stack.visible_child_name().unwrap() == "publish");
+                        if let Some(top_end) = obj.upcast_ref::<MQTTyBasePage>().top_end_widget() {
+                            let visible = view_stack
+                                .visible_child_name()
+                                .map(|name| name == "publish")
+                                .unwrap_or(false);
+                            top_end.set_visible(visible);
+                        }
                     }
                 ));
 

@@ -38,10 +38,34 @@ mod imp {
         editing: Cell<bool>,
 
         #[template_child]
+        name_row: TemplateChild<adw::EntryRow>,
+
+        #[template_child]
         url_row: TemplateChild<adw::EntryRow>,
 
         #[template_child]
         topic_row: TemplateChild<adw::EntryRow>,
+
+        #[template_child]
+        username_row: TemplateChild<adw::EntryRow>,
+
+        #[template_child]
+        password_row: TemplateChild<adw::PasswordEntryRow>,
+
+        #[template_child]
+        mqtt_3_button: TemplateChild<gtk::CheckButton>,
+
+        #[template_child]
+        mqtt_5_button: TemplateChild<gtk::CheckButton>,
+
+        #[template_child]
+        qos_0_button: TemplateChild<gtk::CheckButton>,
+
+        #[template_child]
+        qos_1_button: TemplateChild<gtk::CheckButton>,
+
+        #[template_child]
+        qos_2_button: TemplateChild<gtk::CheckButton>,
     }
 
     #[glib::object_subclass]
@@ -74,17 +98,106 @@ mod imp {
 
                 let private = obj.imp();
 
+                // Name
+                conn_model
+                    .bind_property("name", &*private.name_row, "text")
+                    .bidirectional()
+                    .sync_create()
+                    .build();
+
+                // URL
                 conn_model
                     .bind_property("url", &*private.url_row, "text")
                     .bidirectional()
                     .sync_create()
                     .build();
 
+                // Topic
                 conn_model
                     .bind_property("topic", &*private.topic_row, "text")
                     .bidirectional()
                     .sync_create()
                     .build();
+
+                // Username
+                conn_model
+                    .bind_property("username", &*private.username_row, "text")
+                    .bidirectional()
+                    .sync_create()
+                    .build();
+
+                // Password
+                conn_model
+                    .bind_property("password", &*private.password_row, "text")
+                    .bidirectional()
+                    .sync_create()
+                    .build();
+
+                // MQTT Version
+                let mqtt_version = conn_model.mqtt_version();
+                if mqtt_version == "5" {
+                    private.mqtt_5_button.set_active(true);
+                } else {
+                    private.mqtt_3_button.set_active(true);
+                }
+
+                private.mqtt_3_button.connect_toggled(glib::clone!(
+                    #[weak]
+                    conn_model,
+                    move |btn| {
+                        if btn.is_active() {
+                            conn_model.set_mqtt_version("3".to_string());
+                        }
+                    }
+                ));
+
+                private.mqtt_5_button.connect_toggled(glib::clone!(
+                    #[weak]
+                    conn_model,
+                    move |btn| {
+                        if btn.is_active() {
+                            conn_model.set_mqtt_version("5".to_string());
+                        }
+                    }
+                ));
+
+                // QoS
+                let qos = conn_model.qos();
+                match qos.as_str() {
+                    "1" => private.qos_1_button.set_active(true),
+                    "2" => private.qos_2_button.set_active(true),
+                    _ => private.qos_0_button.set_active(true),
+                }
+
+                private.qos_0_button.connect_toggled(glib::clone!(
+                    #[weak]
+                    conn_model,
+                    move |btn| {
+                        if btn.is_active() {
+                            conn_model.set_qos("0".to_string());
+                        }
+                    }
+                ));
+
+                private.qos_1_button.connect_toggled(glib::clone!(
+                    #[weak]
+                    conn_model,
+                    move |btn| {
+                        if btn.is_active() {
+                            conn_model.set_qos("1".to_string());
+                        }
+                    }
+                ));
+
+                private.qos_2_button.connect_toggled(glib::clone!(
+                    #[weak]
+                    conn_model,
+                    move |btn| {
+                        if btn.is_active() {
+                            conn_model.set_qos("2".to_string());
+                        }
+                    }
+                ));
             });
         }
 

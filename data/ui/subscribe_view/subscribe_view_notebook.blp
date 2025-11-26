@@ -1,0 +1,120 @@
+// Copyright (c) 2025 Oscar Pernia
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU General Public License for more details.
+//
+// You should have received a copy of the GNU General Public License
+// along with this program.  If not, see <https://www.gnu.org/licenses/>.
+using Gtk 4.0;
+using Adw 1;
+
+template $MQTTySubscribeViewNotebook: Adw.Bin {
+  Paned {
+    orientation: vertical;
+    shrink-start-child: false;
+    shrink-end-child: false;
+    position: 280;
+
+    [start]
+    Box {
+      orientation: vertical;
+      vexpand: false;
+
+      Notebook {
+        show-border: false;
+        scrollable: true;
+        vexpand: true;
+
+        NotebookPage {
+          tab-label: _("General");
+
+          child: ScrolledWindow {
+            hscrollbar-policy: never;
+            vscrollbar-policy: automatic;
+            propagate-natural-height: true;
+            min-content-height: 200;
+
+            $MQTTySubscribeGeneralTab general_tab {
+              topic: bind template.topic bidirectional;
+              url: bind template.url bidirectional;
+              username: bind template.username bidirectional;
+              password: bind template.password bidirectional;
+            }
+          };
+        }
+
+        NotebookPage {
+          tab-label: _("Authentication");
+
+          child: ScrolledWindow {
+            hscrollbar-policy: never;
+            vscrollbar-policy: automatic;
+            propagate-natural-height: true;
+            min-content-height: 200;
+
+            $MQTTySubscribeAuthTab {
+              username: bind template.username bidirectional;
+              password: bind template.password bidirectional;
+            }
+          };
+        }
+      }
+    }
+
+    [end]
+    Box {
+      orientation: vertical;
+      vexpand: true;
+
+      Separator {}
+
+      Box {
+        orientation: horizontal;
+        margin-start: 8;
+        margin-end: 8;
+        margin-top: 4;
+        margin-bottom: 4;
+
+        Label {
+          styles ["heading"]
+          label: _("Messages");
+          hexpand: true;
+          xalign: 0;
+        }
+
+        Label message_count_label {
+          styles ["dim-label"]
+          label: bind template.message_count;
+        }
+
+        Button {
+          styles ["flat"]
+          icon-name: "edit-clear-all-symbolic";
+          tooltip-text: _("Clear messages");
+          action-name: "subscribe-notebook.clear-messages";
+        }
+      }
+
+      Separator {}
+
+      ScrolledWindow {
+        vexpand: true;
+        hscrollbar-policy: never;
+        vscrollbar-policy: automatic;
+
+        ListView messages_list {
+          styles ["navigation-sidebar"]
+          single-click-activate: true;
+          activate => $on_message_activated() swapped;
+        }
+      }
+    }
+  }
+}

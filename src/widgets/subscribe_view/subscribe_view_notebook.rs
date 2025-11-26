@@ -20,21 +20,21 @@ use adw::subclass::prelude::*;
 use gtk::{gio, glib};
 
 use crate::client::{MQTTyClient, MQTTyClientMessage, MQTTyClientQos, MQTTyClientVersion};
-use crate::content_type::MQTTyContentType;
 use crate::display_mode::{MQTTyDisplayMode, MQTTyDisplayModeIface};
 use crate::gsettings::MQTTySettingConnection;
 use crate::subclass::prelude::*;
-use crate::widgets::{MQTTyPublishGeneralTab, MQTTyPublishUserPropsTab};
+
+use super::{MQTTyMessageRow, MQTTySubscribeGeneralTab};
 
 mod imp {
 
     use super::*;
 
     #[derive(gtk::CompositeTemplate, glib::Properties)]
-    #[template(resource = "/io/github/otaxhu/MQTTy/ui/publish_view/publish_view_notebook.ui")]
-    #[properties(wrapper_type = super::MQTTyPublishViewNotebook)]
-    pub struct MQTTyPublishViewNotebook {
-        pub client: OnceCell<MQTTyClient>,
+    #[template(resource = "/io/github/otaxhu/MQTTy/ui/subscribe_view/subscribe_view_notebook.ui")]
+    #[properties(wrapper_type = super::MQTTySubscribeViewNotebook)]
+    pub struct MQTTySubscribeViewNotebook {
+        pub client: RefCell<Option<MQTTyClient>>,
 
         #[property(get, set, override_interface = MQTTyDisplayModeIface)]
         display_mode: Cell<MQTTyDisplayMode>,
@@ -52,28 +52,24 @@ mod imp {
         qos: Cell<MQTTyClientQos>,
 
         #[property(get, set)]
-        body: RefCell<String>,
-
-        #[property(get, set, builder(Default::default()))]
-        content_type: Cell<MQTTyContentType>,
-
-        #[property(get, set)]
         username: RefCell<String>,
 
         #[property(get, set)]
         password: RefCell<String>,
 
-        #[template_child]
-        pub user_properties_tab: TemplateChild<MQTTyPublishUserPropsTab>,
+        #[property(get, set)]
+        pub message_count: Cell<u32>,
 
         #[template_child]
-        user_properties_stack: TemplateChild<gtk::Stack>,
+        messages_list: TemplateChild<gtk::ListView>,
+
+        pub messages_model: OnceCell<gio::ListStore>,
 
         #[template_child]
-        pub general_tab: TemplateChild<MQTTyPublishGeneralTab>,
+        pub general_tab: TemplateChild<MQTTySubscribeGeneralTab>,
     }
 
-    impl Default for MQTTyPublishViewNotebook {
+    impl Default for MQTTySubscribeViewNotebook {
         fn default() -> Self {
             Self {
                 display_mode: Cell::new(MQTTyDisplayMode::Desktop),
@@ -82,22 +78,21 @@ mod imp {
                 url: Default::default(),
                 qos: Default::default(),
                 client: Default::default(),
-                body: Default::default(),
-                content_type: Default::default(),
-                user_properties_tab: Default::default(),
                 username: Default::default(),
                 password: Default::default(),
-                user_properties_stack: Default::default(),
+                message_count: Cell::new(0),
+                messages_list: Default::default(),
+                messages_model: Default::default(),
                 general_tab: Default::default(),
             }
         }
     }
 
     #[glib::object_subclass]
-    impl ObjectSubclass for MQTTyPublishViewNotebook {
-        const NAME: &'static str = "MQTTyPublishViewNotebook";
+    impl ObjectSubclass for MQTTySubscribeViewNotebook {
+        const NAME: &'static str = "MQTTySubscribeViewNotebook";
 
-        type Type = super::MQTTyPublishViewNotebook;
+        type Type = super::MQTTySubscribeViewNotebook;
 
         type ParentType = adw::Bin;
 
@@ -105,6 +100,11 @@ mod imp {
 
         fn class_init(klass: &mut Self::Class) {
             klass.bind_template();
+            klass.bind_template_callbacks();
+
+            klass.install_action("subscribe-notebook.clear-messages", None, |this, _, _| {
+                this.clear_messages();
+            });
         }
 
         fn instance_init(obj: &glib::subclass::types::InitializingObject<Self>) {
@@ -113,12 +113,36 @@ mod imp {
     }
 
     #[glib::derived_properties]
-    impl ObjectImpl for MQTTyPublishViewNotebook {
+    impl ObjectImpl for MQTTySubscribeViewNotebook {
         fn constructed(&self) {
             self.parent_constructed();
 
             let obj = self.obj();
 
+            // Setup messages list
+            let messages_model = gio::ListStore::new::<MQTTyMessageRow>();
+            self.messages_model.set(messages_model.clone()).unwrap();
+
+            let factory = gtk::SignalListItemFactory::new();
+            factory.connect_setup(|_, list_item| {
+                let list_item = list_item.downcast_ref::<gtk::ListItem>().unwrap();
+                // The child will be set in bind
+                list_item.set_child(None::<&gtk::Widget>);
+            });
+
+            factory.connect_bind(|_, list_item| {
+                let list_item = list_item.downcast_ref::<gtk::ListItem>().unwrap();
+                let item = list_item.item().and_downcast::<MQTTyMessageRow>();
+                if let Some(row) = item {
+                    list_item.set_child(Some(&row));
+                }
+            });
+
+            let selection = gtk::NoSelection::new(Some(messages_model));
+            self.messages_list.set_model(Some(&selection));
+            self.messages_list.set_factory(Some(&factory));
+
+            // Setup action group for MQTT version and QoS
             let group = gio::SimpleActionGroup::new();
 
             let mqtt_version_state = gio::SimpleAction::new_stateful(
@@ -185,13 +209,7 @@ mod imp {
             group.add_action(&mqtt_version_state);
             group.add_action(&qos_state);
 
-            obj.insert_action_group("publish-view-notebook", Some(&group));
-
-            mqtt_version_state
-                .bind_property("state", &*self.user_properties_stack, "visible-child-name")
-                .transform_to(|_, state: glib::Variant| state.str().map(String::from))
-                .sync_create()
-                .build();
+            obj.insert_action_group("subscribe-notebook", Some(&group));
 
             // Handle profile selection
             self.general_tab.connect_closure(
@@ -204,7 +222,7 @@ mod imp {
                     mqtt_version_state,
                     #[weak]
                     qos_state,
-                    move |_tab: MQTTyPublishGeneralTab, conn: MQTTySettingConnection| {
+                    move |_tab: MQTTySubscribeGeneralTab, conn: MQTTySettingConnection| {
                         // Update all the notebook properties from the profile
                         obj.set_topic(conn.topic());
                         obj.set_url(conn.url());
@@ -223,23 +241,39 @@ mod imp {
             );
         }
     }
-    impl WidgetImpl for MQTTyPublishViewNotebook {}
-    impl BinImpl for MQTTyPublishViewNotebook {}
-    impl MQTTyDisplayModeIfaceImpl for MQTTyPublishViewNotebook {}
+    impl WidgetImpl for MQTTySubscribeViewNotebook {}
+    impl BinImpl for MQTTySubscribeViewNotebook {}
+    impl MQTTyDisplayModeIfaceImpl for MQTTySubscribeViewNotebook {}
+
+    #[gtk::template_callbacks]
+    impl MQTTySubscribeViewNotebook {
+        #[template_callback]
+        fn on_message_activated(&self, position: u32, _list_view: &gtk::ListView) {
+            // TODO: Show message details dialog
+            if let Some(model) = self.messages_model.get() {
+                if let Some(item) = model.item(position) {
+                    let row = item.downcast_ref::<MQTTyMessageRow>().unwrap();
+                    if let Some(msg) = row.message() {
+                        println!("Message clicked: {:?}", msg.topic());
+                    }
+                }
+            }
+        }
+    }
 }
 
 glib::wrapper! {
-    pub struct MQTTyPublishViewNotebook(ObjectSubclass<imp::MQTTyPublishViewNotebook>)
+    pub struct MQTTySubscribeViewNotebook(ObjectSubclass<imp::MQTTySubscribeViewNotebook>)
         @extends gtk::Widget, adw::Bin,
         @implements gtk::Accessible, gtk::Buildable, gtk::ConstraintTarget;
 }
 
-impl MQTTyPublishViewNotebook {
+impl MQTTySubscribeViewNotebook {
     pub fn new() -> Self {
         glib::Object::builder().build()
     }
 
-    pub async fn send(&self) -> Result<(), String> {
+    pub async fn subscribe(&self) -> Result<(), String> {
         let mqtt_version = self.mqtt_version();
 
         let client = MQTTyClient::new(
@@ -251,29 +285,42 @@ impl MQTTyPublishViewNotebook {
 
         client.connect_client().await?;
 
-        let msg = MQTTyClientMessage::new();
+        // Setup message handler
+        let messages_model = self.imp().messages_model.get().unwrap().clone();
+        let obj_weak = self.downgrade();
 
-        msg.set_topic(self.topic());
-        msg.set_qos(self.qos());
-        if self.content_type() != MQTTyContentType::None {
-            msg.set_body(self.body().as_ref());
+        client.connect_message(move |_client, message| {
+            let row = MQTTyMessageRow::from_message(message);
+            messages_model.insert(0, &row);
+
+            // Update message count
+            if let Some(obj) = obj_weak.upgrade() {
+                let count = obj.imp().message_count.get();
+                obj.imp().message_count.set(count + 1);
+                obj.notify("message-count");
+            }
+        });
+
+        // Subscribe to topic
+        client.subscribe(&self.topic(), self.qos()).await?;
+
+        // Store the client to keep connection alive
+        self.imp().client.replace(Some(client));
+
+        Ok(())
+    }
+
+    pub fn clear_messages(&self) {
+        if let Some(model) = self.imp().messages_model.get() {
+            model.remove_all();
+            self.imp().message_count.set(0);
+            self.notify("message-count");
         }
-        msg.set_mqtt_version(mqtt_version);
+    }
+}
 
-        // Specific to MQTT v5
-        if mqtt_version == MQTTyClientVersion::V5 {
-            msg.set_content_type(self.content_type().mime_type());
-            msg.set_user_properties(
-                self.imp()
-                    .user_properties_tab
-                    .entries()
-                    .iter()
-                    .map(|i| (i.key(), i.value()))
-                    .collect::<Vec<_>>()
-                    .as_ref(),
-            );
-        }
-
-        client.publish(&msg).await
+impl Default for MQTTySubscribeViewNotebook {
+    fn default() -> Self {
+        Self::new()
     }
 }

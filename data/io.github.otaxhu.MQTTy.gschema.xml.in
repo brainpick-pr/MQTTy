@@ -15,23 +15,22 @@
     </key>
 
     <!--
-      TODO: This key is not being referenced in any part of the code,
-      MQTTy will get a "Workspace" feature very soon, in which all of
-      publish tabs and subscriptions will be saved to a serializable
-      file, that will be able to be loaded up to the app.
-    -->
-    <!--
       This is the human-readable type definition for this setting:
 
-        type open-connections = []struct
+        type connection-profiles = []struct
           {
+            name: String;
             url: String;
             topic: String;
+            username: String;
+            password: String;
+            mqtt_version: String;  // "3" or "5"
+            qos: String;  // "0", "1", or "2"
           }
      -->
-    <!-- <key name="connections" type="a(ss)">
+    <key name="connections" type="a(sssssss)">
       <default>[]</default>
-      <summary>List of open connections</summary>
-    </key> -->
+      <summary>List of saved connection profiles</summary>
+    </key>
   </schema>
 </schemalist>
