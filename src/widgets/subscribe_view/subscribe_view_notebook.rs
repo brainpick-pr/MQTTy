@@ -14,17 +14,19 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use std::cell::{Cell, OnceCell, RefCell};
+use std::collections::HashMap;
 
 use adw::prelude::*;
 use adw::subclass::prelude::*;
 use gtk::{gio, glib};
 
-use crate::client::{MQTTyClient, MQTTyClientMessage, MQTTyClientQos, MQTTyClientVersion};
+use crate::client::{MQTTyClient, MQTTyClientMessage, MQTTyClientQos, MQTTyClientVersion, TlsOptions};
 use crate::display_mode::{MQTTyDisplayMode, MQTTyDisplayModeIface};
 use crate::gsettings::MQTTySettingConnection;
 use crate::subclass::prelude::*;
 
-use super::{MQTTyMessageRow, MQTTySubscribeGeneralTab, MQTTyTopicTreeView};
+use super::{MQTTyMessageRow, MQTTySubscribeGeneralTab};
+use crate::widgets::{MQTTyDataChart, MQTTyMessageDetailDialog, MQTTyTopicTreeView};
 
 mod imp {
 
@@ -58,6 +60,18 @@ mod imp {
         password: RefCell<String>,
 
         #[property(get, set)]
+        enable_tls: Cell<bool>,
+
+        #[property(get, set)]
+        ca_cert_path: RefCell<String>,
+
+        #[property(get, set)]
+        client_cert_path: RefCell<String>,
+
+        #[property(get, set)]
+        client_key_path: RefCell<String>,
+
+        #[property(get, set)]
         pub message_count: Cell<u32>,
 
         #[template_child]
@@ -70,6 +84,24 @@ mod imp {
 
         #[template_child]
         pub general_tab: TemplateChild<MQTTySubscribeGeneralTab>,
+
+        #[template_child]
+        pub search_entry: TemplateChild<gtk::SearchEntry>,
+
+        /// Store previous messages per topic for diff view
+        pub message_history: RefCell<HashMap<String, MQTTyClientMessage>>,
+
+        #[property(get, set)]
+        pub search_text: RefCell<String>,
+
+        pub filter_model: OnceCell<gtk::FilterListModel>,
+        pub custom_filter: OnceCell<gtk::CustomFilter>,
+
+        #[template_child]
+        pub chart_box: TemplateChild<gtk::Box>,
+
+        /// Store charts per topic
+        pub topic_charts: RefCell<HashMap<String, MQTTyDataChart>>,
     }
 
     impl Default for MQTTySubscribeViewNotebook {
@@ -83,11 +115,22 @@ mod imp {
                 client: Default::default(),
                 username: Default::default(),
                 password: Default::default(),
+                enable_tls: Default::default(),
+                ca_cert_path: Default::default(),
+                client_cert_path: Default::default(),
+                client_key_path: Default::default(),
                 message_count: Cell::new(0),
                 messages_list: Default::default(),
                 topic_tree_view: Default::default(),
                 messages_model: Default::default(),
                 general_tab: Default::default(),
+                search_entry: Default::default(),
+                message_history: RefCell::new(HashMap::new()),
+                search_text: Default::default(),
+                filter_model: Default::default(),
+                custom_filter: Default::default(),
+                chart_box: Default::default(),
+                topic_charts: RefCell::new(HashMap::new()),
             }
         }
     }
@@ -127,6 +170,28 @@ mod imp {
             let messages_model = gio::ListStore::new::<MQTTyMessageRow>();
             self.messages_model.set(messages_model.clone()).unwrap();
 
+            // Create custom filter for search
+            let search_text_ref = self.search_text.clone();
+            let custom_filter = gtk::CustomFilter::new(move |item| {
+                let search = search_text_ref.borrow();
+                if search.is_empty() {
+                    return true;
+                }
+
+                if let Some(row) = item.downcast_ref::<MQTTyMessageRow>() {
+                    let topic = row.topic().to_lowercase();
+                    let body = row.body_preview().to_lowercase();
+                    topic.contains(search.as_str()) || body.contains(search.as_str())
+                } else {
+                    true
+                }
+            });
+            self.custom_filter.set(custom_filter.clone()).unwrap();
+
+            // Create filter model
+            let filter_model = gtk::FilterListModel::new(Some(messages_model), Some(custom_filter));
+            self.filter_model.set(filter_model.clone()).unwrap();
+
             let factory = gtk::SignalListItemFactory::new();
             factory.connect_setup(|_, list_item| {
                 let list_item = list_item.downcast_ref::<gtk::ListItem>().unwrap();
@@ -142,7 +207,7 @@ mod imp {
                 }
             });
 
-            let selection = gtk::NoSelection::new(Some(messages_model));
+            let selection = gtk::NoSelection::new(Some(filter_model));
             self.messages_list.set_model(Some(&selection));
             self.messages_list.set_factory(Some(&factory));
 
@@ -215,6 +280,24 @@ mod imp {
 
             obj.insert_action_group("subscribe-notebook", Some(&group));
 
+            // Handle clear retained message request from topic tree
+            let obj_weak = obj.downgrade();
+            self.topic_tree_view.connect_closure(
+                "clear-retained-requested",
+                false,
+                glib::closure_local!(move |_tree_view: MQTTyTopicTreeView, topic: String| {
+                    if let Some(obj) = obj_weak.upgrade() {
+                        glib::spawn_future_local(glib::clone!(
+                            #[weak]
+                            obj,
+                            async move {
+                                obj.clear_retained_message(&topic).await;
+                            }
+                        ));
+                    }
+                }),
+            );
+
             // Handle profile selection
             self.general_tab.connect_closure(
                 "profile-selected",
@@ -253,14 +336,36 @@ mod imp {
     impl MQTTySubscribeViewNotebook {
         #[template_callback]
         fn on_message_activated(&self, position: u32, _list_view: &gtk::ListView) {
-            // TODO: Show message details dialog
             if let Some(model) = self.messages_model.get() {
                 if let Some(item) = model.item(position) {
                     let row = item.downcast_ref::<MQTTyMessageRow>().unwrap();
                     if let Some(msg) = row.message() {
-                        println!("Message clicked: {:?}", msg.topic());
+                        let dialog = MQTTyMessageDetailDialog::new();
+
+                        // Get previous message for diff
+                        let history = self.message_history.borrow();
+                        let previous = history.get(&msg.topic());
+
+                        dialog.set_message(&msg, previous);
+
+                        if let Some(root) = self.obj().root() {
+                            if let Some(window) = root.downcast_ref::<gtk::Window>() {
+                                dialog.present(Some(window));
+                            }
+                        }
                     }
                 }
+            }
+        }
+
+        #[template_callback]
+        fn on_search_changed(&self, search_entry: &gtk::SearchEntry) {
+            let search_text = search_entry.text().to_string().to_lowercase();
+            self.search_text.replace(search_text);
+
+            // Invalidate the filter to re-run filtering
+            if let Some(filter) = self.custom_filter.get() {
+                filter.changed(gtk::FilterChange::Different);
             }
         }
     }
@@ -287,6 +392,24 @@ impl MQTTySubscribeViewNotebook {
             &self.password(),
         );
 
+        // Set TLS options
+        let tls_options = TlsOptions {
+            enabled: self.enable_tls(),
+            ca_cert_path: {
+                let path = self.ca_cert_path();
+                if path.is_empty() { None } else { Some(path) }
+            },
+            client_cert_path: {
+                let path = self.client_cert_path();
+                if path.is_empty() { None } else { Some(path) }
+            },
+            client_key_path: {
+                let path = self.client_key_path();
+                if path.is_empty() { None } else { Some(path) }
+            },
+        };
+        client.set_tls_options(tls_options);
+
         client.connect_client().await?;
 
         // Setup message handler
@@ -308,6 +431,12 @@ impl MQTTySubscribeViewNotebook {
                 let body = message.body();
                 let body_str = String::from_utf8_lossy(&body);
                 obj.imp().topic_tree_view.process_message(&topic, &body_str);
+
+                // Update chart with numeric data
+                obj.update_chart(&topic, &body_str);
+
+                // Store current message as previous for next diff
+                obj.imp().message_history.borrow_mut().insert(topic, message.clone());
             }
         });
 
@@ -325,6 +454,56 @@ impl MQTTySubscribeViewNotebook {
             model.remove_all();
             self.imp().message_count.set(0);
             self.notify("message-count");
+        }
+    }
+
+    /// Update chart with numeric data from a message
+    fn update_chart(&self, topic: &str, payload: &str) {
+        let mut charts = self.imp().topic_charts.borrow_mut();
+
+        // Get or create chart for this topic
+        let chart = charts.entry(topic.to_string()).or_insert_with(|| {
+            let chart = MQTTyDataChart::new();
+            chart.set_topic(topic);
+            chart.set_hexpand(true);
+            chart.set_height_request(150);
+
+            // Add to chart box with a frame
+            let frame = gtk::Frame::new(Some(topic));
+            frame.set_child(Some(&chart));
+            frame.set_margin_start(4);
+            frame.set_margin_end(4);
+            frame.set_margin_top(4);
+            frame.set_margin_bottom(4);
+
+            self.imp().chart_box.append(&frame);
+            chart
+        });
+
+        // Try to add the payload as a data point
+        chart.try_add_from_payload(payload);
+    }
+
+    /// Clear a retained message by publishing an empty payload with retain flag
+    pub async fn clear_retained_message(&self, topic: &str) {
+        let client_ref = self.imp().client.borrow();
+        if let Some(client) = client_ref.as_ref() {
+            let message = MQTTyClientMessage::new();
+            message.set_topic(topic);
+            message.set_body(&[]);
+            message.set_retained(true);
+            message.set_qos(self.qos());
+
+            match client.publish(&message).await {
+                Ok(_) => {
+                    tracing::info!("Cleared retained message for topic: {}", topic);
+                }
+                Err(e) => {
+                    tracing::error!("Failed to clear retained message for {}: {}", topic, e);
+                }
+            }
+        } else {
+            tracing::warn!("Cannot clear retained message: not connected");
         }
     }
 }

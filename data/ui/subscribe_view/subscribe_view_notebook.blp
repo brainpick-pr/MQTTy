@@ -59,9 +59,39 @@ template $MQTTySubscribeViewNotebook: Adw.Bin {
             propagate-natural-height: true;
             min-content-height: 200;
 
-            $MQTTySubscribeAuthTab {
+            $MQTTySubscribeAuthTab auth_tab {
               username: bind template.username bidirectional;
               password: bind template.password bidirectional;
+              enable-tls: bind template.enable_tls bidirectional;
+              ca-cert-path: bind template.ca_cert_path bidirectional;
+              client-cert-path: bind template.client_cert_path bidirectional;
+              client-key-path: bind template.client_key_path bidirectional;
+            }
+          };
+        }
+
+        NotebookPage {
+          tab-label: _("Charts");
+
+          child: ScrolledWindow {
+            hscrollbar-policy: never;
+            vscrollbar-policy: automatic;
+            propagate-natural-height: true;
+            min-content-height: 200;
+
+            Box chart_box {
+              orientation: vertical;
+              spacing: 8;
+              margin-start: 8;
+              margin-end: 8;
+              margin-top: 8;
+              margin-bottom: 8;
+
+              Label {
+                styles ["dim-label"]
+                label: _("Charts will appear here for numeric data");
+                visible: true;
+              }
             }
           };
         }
@@ -110,6 +140,14 @@ template $MQTTySubscribeViewNotebook: Adw.Bin {
             tooltip-text: _("Clear messages");
             action-name: "subscribe-notebook.clear-messages";
           }
+        }
+
+        SearchEntry search_entry {
+          placeholder-text: _("Search topics or messages...");
+          margin-start: 8;
+          margin-end: 8;
+          margin-bottom: 4;
+          search-changed => $on_search_changed() swapped;
         }
 
         Separator {}

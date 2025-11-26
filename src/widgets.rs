@@ -15,19 +15,24 @@
 
 mod add_conn_card;
 mod conn_card;
+mod data_chart;
 mod edit_conn_list_box;
 mod key_value_row;
+mod message_detail_dialog;
 mod publish_view;
 mod source_view;
 mod subscribe_view;
+mod topic_tree;
 
 pub mod base_card;
 
 pub use add_conn_card::MQTTyAddConnCard;
 pub use base_card::MQTTyBaseCard;
 pub use conn_card::MQTTyConnCard;
+pub use data_chart::MQTTyDataChart;
 pub use edit_conn_list_box::MQTTyEditConnListBox;
 pub use key_value_row::MQTTyKeyValueRow;
+pub use message_detail_dialog::MQTTyMessageDetailDialog;
 pub use publish_view::{
     MQTTyPublishAuthTab, MQTTyPublishBodyTab, MQTTyPublishGeneralTab, MQTTyPublishUserPropsTab,
     MQTTyPublishView,
@@ -38,5 +43,3 @@ pub use subscribe_view::{
     MQTTySubscribeViewNotebook,
 };
 pub use topic_tree::{MQTTyTopicItem, MQTTyTopicTreeView};
-
-mod topic_tree;

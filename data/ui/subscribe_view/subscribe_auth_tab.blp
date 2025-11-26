@@ -17,20 +17,120 @@ using Adw 1;
 
 template $MQTTySubscribeAuthTab: Adw.Bin {
   Adw.Clamp {
-    Adw.PreferencesGroup {
+    Box {
+      orientation: vertical;
+      spacing: 16;
       margin-top: 16;
       margin-bottom: 16;
       margin-start: 16;
       margin-end: 16;
 
-      Adw.EntryRow {
-        title: _("Username");
-        text: bind template.username bidirectional;
+      Adw.PreferencesGroup {
+        title: _("Credentials");
+
+        Adw.EntryRow {
+          title: _("Username");
+          text: bind template.username bidirectional;
+        }
+
+        Adw.PasswordEntryRow {
+          title: _("Password");
+          text: bind template.password bidirectional;
+        }
       }
 
-      Adw.PasswordEntryRow {
-        title: _("Password");
-        text: bind template.password bidirectional;
+      Adw.PreferencesGroup {
+        title: _("TLS/SSL Configuration");
+
+        Adw.SwitchRow enable_tls_row {
+          title: _("Enable TLS");
+          subtitle: _("Use secure connection");
+          active: bind template.enable_tls bidirectional;
+        }
+
+        Adw.ActionRow ca_cert_row {
+          title: _("CA Certificate");
+          subtitle: bind template.ca_cert_path;
+          activatable: true;
+          activated => $on_ca_cert_clicked() swapped;
+          sensitive: bind template.enable_tls;
+
+          [suffix]
+          Button {
+            styles ["flat"]
+            icon-name: "folder-open-symbolic";
+            valign: center;
+            tooltip-text: _("Select CA certificate file");
+            clicked => $on_ca_cert_clicked() swapped;
+            sensitive: bind template.enable_tls;
+          }
+
+          [suffix]
+          Button clear_ca_btn {
+            styles ["flat"]
+            icon-name: "edit-clear-symbolic";
+            valign: center;
+            tooltip-text: _("Clear");
+            clicked => $on_clear_ca_cert() swapped;
+            sensitive: bind template.enable_tls;
+          }
+        }
+
+        Adw.ActionRow client_cert_row {
+          title: _("Client Certificate");
+          subtitle: bind template.client_cert_path;
+          activatable: true;
+          activated => $on_client_cert_clicked() swapped;
+          sensitive: bind template.enable_tls;
+
+          [suffix]
+          Button {
+            styles ["flat"]
+            icon-name: "folder-open-symbolic";
+            valign: center;
+            tooltip-text: _("Select client certificate file");
+            clicked => $on_client_cert_clicked() swapped;
+            sensitive: bind template.enable_tls;
+          }
+
+          [suffix]
+          Button {
+            styles ["flat"]
+            icon-name: "edit-clear-symbolic";
+            valign: center;
+            tooltip-text: _("Clear");
+            clicked => $on_clear_client_cert() swapped;
+            sensitive: bind template.enable_tls;
+          }
+        }
+
+        Adw.ActionRow client_key_row {
+          title: _("Client Key");
+          subtitle: bind template.client_key_path;
+          activatable: true;
+          activated => $on_client_key_clicked() swapped;
+          sensitive: bind template.enable_tls;
+
+          [suffix]
+          Button {
+            styles ["flat"]
+            icon-name: "folder-open-symbolic";
+            valign: center;
+            tooltip-text: _("Select client key file");
+            clicked => $on_client_key_clicked() swapped;
+            sensitive: bind template.enable_tls;
+          }
+
+          [suffix]
+          Button {
+            styles ["flat"]
+            icon-name: "edit-clear-symbolic";
+            valign: center;
+            tooltip-text: _("Clear");
+            clicked => $on_clear_client_key() swapped;
+            sensitive: bind template.enable_tls;
+          }
+        }
       }
     }
   }

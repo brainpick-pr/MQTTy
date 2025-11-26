@@ -103,8 +103,9 @@ fi
 
 # Copy resources if meson install was successful
 if [ -d "$BUILD_DIR/meson/data" ]; then
-    # Copy GResource file
-    find "$BUILD_DIR/meson/data" -name "*.gresource" -exec cp {} "$APP_BUNDLE/Contents/Resources/" \;
+    # Copy GResource file to the location expected by the app (share/MQTTy/)
+    mkdir -p "$APP_BUNDLE/Contents/share/MQTTy"
+    find "$BUILD_DIR/meson/data" -name "*.gresource" -exec cp {} "$APP_BUNDLE/Contents/share/MQTTy/" \;
 fi
 
 # Copy SVG icon for GTK

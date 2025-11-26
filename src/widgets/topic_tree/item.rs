@@ -1,4 +1,4 @@
-use std::cell::RefCell;
+use std::cell::{OnceCell, RefCell};
 
 use gtk::{gio, glib};
 use gtk::prelude::*;
@@ -19,7 +19,7 @@ mod imp {
         #[property(get, set)]
         payload: RefCell<String>,
 
-        pub children: RefCell<gio::ListStore>,
+        pub children: OnceCell<gio::ListStore>,
     }
 
     #[glib::object_subclass]
@@ -32,7 +32,7 @@ mod imp {
     impl ObjectImpl for MQTTyTopicItem {
         fn constructed(&self) {
             self.parent_constructed();
-            self.children.replace(gio::ListStore::new::<super::MQTTyTopicItem>());
+            let _ = self.children.set(gio::ListStore::new::<super::MQTTyTopicItem>());
         }
     }
 }
@@ -50,7 +50,7 @@ impl MQTTyTopicItem {
     }
 
     pub fn children(&self) -> gio::ListStore {
-        self.imp().children.borrow().clone()
+        self.imp().children.get().cloned().unwrap_or_else(|| gio::ListStore::new::<MQTTyTopicItem>())
     }
 
     pub fn add_child(&self, item: &MQTTyTopicItem) {

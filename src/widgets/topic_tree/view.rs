@@ -1,6 +1,9 @@
-use std::cell::RefCell;
+use std::cell::{OnceCell, RefCell};
+use std::sync::LazyLock;
 
+use gettextrs::gettext;
 use gtk::{gio, glib};
+use gtk::glib::subclass::Signal;
 use gtk::prelude::*;
 use gtk::subclass::prelude::*;
 
@@ -12,29 +15,29 @@ mod imp {
     #[derive(Default, gtk::CompositeTemplate, glib::Properties)]
     #[template(string = r#"
     <interface>
-      <template class="MQTTyTopicTreeView" parent="gtk::Box">
+      <template class="MQTTyTopicTreeView" parent="GtkBox">
         <property name="orientation">vertical</property>
         <child>
-          <object class="gtk::ScrolledWindow">
+          <object class="GtkScrolledWindow">
             <property name="vexpand">true</property>
             <child>
-              <object class="gtk::ColumnView" id="column_view">
+              <object class="GtkColumnView" id="column_view">
                 <property name="show-row-separators">true</property>
                 <property name="show-column-separators">true</property>
                 <child>
-                    <object class="gtk::ColumnViewColumn">
+                    <object class="GtkColumnViewColumn">
                         <property name="title">Topic</property>
                         <property name="expand">true</property>
                         <property name="factory">
-                            <object class="gtk::SignalListItemFactory" id="topic_factory"/>
+                            <object class="GtkSignalListItemFactory" id="topic_factory"/>
                         </property>
                     </object>
                 </child>
                 <child>
-                    <object class="gtk::ColumnViewColumn">
+                    <object class="GtkColumnViewColumn">
                         <property name="title">Value</property>
                         <property name="factory">
-                            <object class="gtk::SignalListItemFactory" id="value_factory"/>
+                            <object class="GtkSignalListItemFactory" id="value_factory"/>
                         </property>
                     </object>
                 </child>
@@ -50,7 +53,7 @@ mod imp {
         #[template_child]
         pub column_view: TemplateChild<gtk::ColumnView>,
 
-        pub root_model: RefCell<gio::ListStore>,
+        pub root_model: OnceCell<gio::ListStore>,
         pub tree_model: RefCell<Option<gtk::TreeListModel>>,
     }
 
@@ -62,7 +65,6 @@ mod imp {
 
         fn class_init(klass: &mut Self::Class) {
             klass.bind_template();
-            klass.bind_template_callbacks();
         }
 
         fn instance_init(obj: &glib::subclass::types::InitializingObject<Self>) {
@@ -72,12 +74,23 @@ mod imp {
 
     #[glib::derived_properties]
     impl ObjectImpl for MQTTyTopicTreeView {
+        fn signals() -> &'static [Signal] {
+            static SIGNALS: LazyLock<Vec<Signal>> = LazyLock::new(|| {
+                vec![
+                    Signal::builder("clear-retained-requested")
+                        .param_types([String::static_type()])
+                        .build(),
+                ]
+            });
+            &SIGNALS
+        }
+
         fn constructed(&self) {
             self.parent_constructed();
-            
+
             let obj = self.obj();
             let root = gio::ListStore::new::<MQTTyTopicItem>();
-            self.root_model.replace(root.clone());
+            let _ = self.root_model.set(root.clone());
 
             let tree_model = gtk::TreeListModel::new(
                 root,
@@ -134,8 +147,59 @@ mod imp {
 
                 item.bind_property("payload", &label, "label").sync_create().build();
             });
+
+            // Setup context menu for right-click
+            self.setup_context_menu();
         }
     }
+
+    impl MQTTyTopicTreeView {
+        fn setup_context_menu(&self) {
+            let obj = self.obj();
+
+            // Create popover menu
+            let menu = gio::Menu::new();
+            menu.append(Some(&gettext("Clear Retained Message")), Some("topic-tree.clear-retained"));
+
+            let popover = gtk::PopoverMenu::from_model(Some(&menu));
+            popover.set_parent(&*self.column_view);
+            popover.set_has_arrow(false);
+
+            // Install action
+            let action_group = gio::SimpleActionGroup::new();
+
+            let clear_action = gio::SimpleAction::new("clear-retained", None);
+            let obj_weak = obj.downgrade();
+            let selection_clone = self.column_view.model().unwrap().downcast::<gtk::SingleSelection>().ok();
+            clear_action.connect_activate(move |_, _| {
+                if let Some(obj) = obj_weak.upgrade() {
+                    if let Some(selection) = &selection_clone {
+                        if let Some(row) = selection.selected_item().and_downcast::<gtk::TreeListRow>() {
+                            if let Some(item) = row.item().and_downcast::<MQTTyTopicItem>() {
+                                let topic = item.full_topic();
+                                obj.emit_by_name::<()>("clear-retained-requested", &[&topic]);
+                            }
+                        }
+                    }
+                }
+            });
+            action_group.add_action(&clear_action);
+            obj.insert_action_group("topic-tree", Some(&action_group));
+
+            // Setup gesture for right-click
+            let gesture = gtk::GestureClick::new();
+            gesture.set_button(3); // Right-click
+            let popover_clone = popover.clone();
+            gesture.connect_released(move |gesture, _, x, y| {
+                let widget = gesture.widget();
+                let point = gtk::gdk::Rectangle::new(x as i32, y as i32, 1, 1);
+                popover_clone.set_pointing_to(Some(&point));
+                popover_clone.popup();
+            });
+            self.column_view.add_controller(gesture);
+        }
+    }
+
     impl WidgetImpl for MQTTyTopicTreeView {}
     impl BoxImpl for MQTTyTopicTreeView {}
 }
@@ -153,8 +217,10 @@ impl MQTTyTopicTreeView {
 
     pub fn process_message(&self, topic: &str, payload: &str) {
         let parts: Vec<&str> = topic.split('/').collect();
-        let root_model = self.imp().root_model.borrow();
-        
+        let Some(root_model) = self.imp().root_model.get() else {
+            return;
+        };
+
         let mut current_model = root_model.clone();
         let mut full_path = String::new();
 

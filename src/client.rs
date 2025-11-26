@@ -42,6 +42,15 @@ pub enum MQTTyClientQos {
     Qos2,
 }
 
+/// TLS configuration options
+#[derive(Default, Clone)]
+pub struct TlsOptions {
+    pub enabled: bool,
+    pub ca_cert_path: Option<String>,
+    pub client_cert_path: Option<String>,
+    pub client_key_path: Option<String>,
+}
+
 mod imp {
 
     use super::*;
@@ -62,6 +71,8 @@ mod imp {
         password: RefCell<String>,
 
         client: OnceCell<paho::AsyncClient>,
+
+        pub tls_options: RefCell<TlsOptions>,
     }
 
     #[glib::object_subclass]
@@ -155,13 +166,41 @@ mod imp {
             let client = self.client();
 
             let obj = self.obj();
+            let tls = self.tls_options.borrow();
+
+            // Build SSL options if TLS is enabled
+            let ssl_opts = if tls.enabled {
+                let mut ssl_builder = paho::SslOptionsBuilder::new();
+
+                if let Some(ref ca_path) = tls.ca_cert_path {
+                    if !ca_path.is_empty() {
+                        ssl_builder.trust_store(ca_path).map_err(|e| e.to_string())?;
+                    }
+                }
+
+                if let Some(ref cert_path) = tls.client_cert_path {
+                    if !cert_path.is_empty() {
+                        ssl_builder.key_store(cert_path).map_err(|e| e.to_string())?;
+                    }
+                }
+
+                if let Some(ref key_path) = tls.client_key_path {
+                    if !key_path.is_empty() {
+                        ssl_builder.private_key(key_path).map_err(|e| e.to_string())?;
+                    }
+                }
+
+                ssl_builder.finalize()
+            } else {
+                paho::SslOptions::default()
+            };
 
             client
                 .connect(Some(
                     paho::ConnectOptionsBuilder::with_mqtt_version(obj.mqtt_version())
                         .user_name(obj.username())
                         .password(obj.password())
-                        .ssl_options(Default::default())
+                        .ssl_options(ssl_opts)
                         .finalize(),
                 ))
                 .await
@@ -247,6 +286,10 @@ impl MQTTyClient {
             false,
             glib::closure_local!(move |o: &Self, msg: &MQTTyClientMessage| cb(o, msg)),
         )
+    }
+
+    pub fn set_tls_options(&self, options: TlsOptions) {
+        self.imp().tls_options.replace(options);
     }
 }
 
