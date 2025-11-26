@@ -37,3 +37,6 @@ pub use subscribe_view::{
     MQTTyMessageRow, MQTTySubscribeAuthTab, MQTTySubscribeGeneralTab, MQTTySubscribeView,
     MQTTySubscribeViewNotebook,
 };
+pub use topic_tree::{MQTTyTopicItem, MQTTyTopicTreeView};
+
+mod topic_tree;

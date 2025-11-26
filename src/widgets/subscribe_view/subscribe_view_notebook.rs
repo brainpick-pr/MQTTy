@@ -24,7 +24,7 @@ use crate::display_mode::{MQTTyDisplayMode, MQTTyDisplayModeIface};
 use crate::gsettings::MQTTySettingConnection;
 use crate::subclass::prelude::*;
 
-use super::{MQTTyMessageRow, MQTTySubscribeGeneralTab};
+use super::{MQTTyMessageRow, MQTTySubscribeGeneralTab, MQTTyTopicTreeView};
 
 mod imp {
 
@@ -63,6 +63,9 @@ mod imp {
         #[template_child]
         messages_list: TemplateChild<gtk::ListView>,
 
+        #[template_child]
+        pub topic_tree_view: TemplateChild<MQTTyTopicTreeView>,
+
         pub messages_model: OnceCell<gio::ListStore>,
 
         #[template_child]
@@ -82,6 +85,7 @@ mod imp {
                 password: Default::default(),
                 message_count: Cell::new(0),
                 messages_list: Default::default(),
+                topic_tree_view: Default::default(),
                 messages_model: Default::default(),
                 general_tab: Default::default(),
             }
@@ -298,6 +302,12 @@ impl MQTTySubscribeViewNotebook {
                 let count = obj.imp().message_count.get();
                 obj.imp().message_count.set(count + 1);
                 obj.notify("message-count");
+
+                // Update topic tree
+                let topic = message.topic();
+                let body = message.body();
+                let body_str = String::from_utf8_lossy(&body);
+                obj.imp().topic_tree_view.process_message(&topic, &body_str);
             }
         });
 
